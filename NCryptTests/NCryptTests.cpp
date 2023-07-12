@@ -52,7 +52,7 @@ int main()
         std::cout << "\nError EnumKeys: " << std::hex << status << std::endl;
         return -1;
     }
-
+    
     std::cout << "\nSuccess EnumKeys" << std::endl;
 
     std::cout << "\nKey pszName: " << CW2A(keys[0].pszName) << std::endl;
@@ -67,8 +67,9 @@ int main()
     }
     std::cout << "\nSuccess OpenKey" << std::endl;
     std::cout << "\nKeyHandle: " << kHandle << std::endl;
+    std::cout << "Was a valide key? "<<(NCryptIsKeyHandle(kHandle) ? "True" : "False") << std::endl;
 
-    DWORD trueHandleSize, trueHandleSizeBytes;
+    /*DWORD trueHandleSize, trueHandleSizeBytes;
 
     status = NCryptGetProperty(kHandle, NCRYPT_PCP_PLATFORMHANDLE_PROPERTY, NULL, {}, &trueHandleSizeBytes, 0);
     if (status != 0) {
@@ -89,20 +90,20 @@ int main()
     std::cout << "\nSuccess GetProperty2" << std::endl;
     std::cout << "\nTrueHandle size (" << trueHandleSize << " )" << std::endl;
 
-    std::cout << (void*)trueHandle << std::endl;
+    std::cout << (void*)trueHandle << std::endl;*/
 
-    InitTPM();
+    /*InitTPM();
 
     auto response = tpm._AllowErrors().NV_ReadPublic(trueHandle);
     if (!tpm._LastCommandSucceeded()) {
         std::cout << "Error detected: " << TpmCpp::EnumToStr(tpm._GetLastResponseCode()) << std::endl;
         return -1;
     }
-    std::cout << response.ToString() << std::endl;
+    std::cout << response.ToString() << std::endl;*/
     
     NCryptFreeBuffer(providers);
     NCryptFreeBuffer(keys);
-    NCryptFreeBuffer(&trueHandle);
+    //NCryptFreeBuffer(&trueHandle);
     NCryptFreeObject(pHandle);
     NCryptFreeObject(kHandle);
 }
