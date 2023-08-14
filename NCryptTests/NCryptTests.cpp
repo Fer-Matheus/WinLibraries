@@ -1,187 +1,84 @@
-#include <iostream>
-#include <windows.h>
+#include <Windows.h>
 #include <atlstr.h>
 #include <ncrypt.h>
 #pragma comment(lib, "ncrypt.lib")
-#include <bcrypt.h>
-#include "NCryptTests.h"
-#pragma comment(lib, "bcrypt.lib")
 
-bool run = true;
-int op;
-std::string keyName, algName;
-DWORD countProviders;
-NCryptProviderName* providers;
+using namespace std;
+
+#define NO_MORE_ITEMS -2146893782
+
+#define Error(status) if (status != 0) cout << "Error Code: " << hex << status << endl;
+
+#define LOG(message) cout << message << endl;
+
+#include <iostream>
+
 NCRYPT_PROV_HANDLE pHandle;
-NCryptKeyName* keys;
-PVOID temp = NULL;
 NCRYPT_KEY_HANDLE kHandle;
 SECURITY_STATUS status;
+NCryptKeyName* keys;
+PVOID temp = NULL;
+bool createKey = true;
 
-void ChooseProvider() {
-     status = NCryptEnumStorageProviders(&countProviders, &providers, 0);
-    if (status != 0) {
-        std::cout << "Error EnumStorageProviders: " << std::hex << status << std::endl;
-    }
+void CreateKey() {
+    cout << "Starting key creating flow\n\n";
 
-    for (int i = 0; i < countProviders; i++) {
-        std::cout << "Provider " << i << ": " << CW2A(providers[i].pszName) << std::endl;
-    }
+    cout << "Opening Storage provider (PCP)...\n\n";
+    status = NCryptOpenStorageProvider(&pHandle, L"Microsoft Platform Crypto Provider", 0);
+    Error(status);
 
-    int option;
-    std::cout << "\nChoose one of the providers above" << std::endl;
-    std::cin >> option;
+    status = NCryptCreatePersistedKey(pHandle, &kHandle, L"RSA", L"TPM", 0, NCRYPT_OVERWRITE_KEY_FLAG);
+    cout << "Creating Key...\n\n";
+    Error(status);
 
-    auto providerName = providers[option].pszName;
+    cout << "Defining key usage property...\n\n";
+    status = NCryptSetProperty(kHandle, NCRYPT_KEY_USAGE_PROPERTY, (PBYTE)NCRYPT_ALLOW_ALL_USAGES, NCRYPT_MAX_PROPERTY_DATA, 0);
 
-    status = NCryptOpenStorageProvider(&pHandle, providerName, 0);
-    if (status != 0) {
-        std::cout << "\nError OpenStorage: " << std::hex << status << std::endl;
-        exit(-1);
-    }
+    cout << "Finalizing the key in the provider (PCP)...\n\n";
+    status = NCryptFinalizeKey(kHandle, 0);
 
-    std::cout << "\nSuccess OpenStorage" << std::endl;
-    Sleep(3000);
+    cout << "Key creating flow success\n\n";
+    Error(status);
 }
 
-void EnumKeys()
-{
-    status = NCryptEnumKeys(pHandle, NULL, &keys, &temp, NCRYPT_MACHINE_KEY_FLAG);
-    if (status != 0 && status != -2146893782) {
-        std::cout << "\nError EnumKeys: " << status << std::endl;
-        exit(-1);
-    }
-    std::cout << "\nSuccess EnumKeys" << std::endl;
+void RetrieveKey() {
+    cout << "Retrieving key flow\n\n";
 
-    std::cout << "\nKey pszName: " << CW2A(keys[0].pszName) << std::endl;
-    std::cout << "\nKey Algorithm: " << CW2A(keys[0].pszAlgid) << std::endl;
-    Sleep(3000);
+    cout << "Opening Storage provider (PCP)...\n\n";
+    status = NCryptOpenStorageProvider(&pHandle, L"Microsoft Platform Crypto Provider", 0);
+    Error(status);
+
+    cout << "Opening key from the provider (PCP)...\n\n";
+    status = NCryptOpenKey(pHandle, &kHandle, L"7b83e0bc-e218-400c-8a73-7b9139901193", 0, 0);
+    Error(status);
+
+    cout << "Validating recovery key...\n\n";
+    if (NCryptIsKeyHandle(kHandle) ? cout << "Valid key!" << endl : cout << "Invalid key!" << endl);
 }
 
-void OpenKey()
-{
-    status = NCryptOpenKey(pHandle, &kHandle, keys[0].pszName, 0, 0);
-    if (status != 0) {
-        std::cout << "\nError OpenKey: " << std::hex << status << std::endl;
-        exit(-1);
-    }
-    std::cout << "\nSuccess OpenKey" << std::endl;
-    std::cout << "\nKeyHandle: " << kHandle << std::endl;
-    std::cout << "Was a valide key? " << (NCryptIsKeyHandle(kHandle) ? "True" : "False") << std::endl;
-    Sleep(3000);
-}
-void OpenKey(std::string keyName)
-{
-    std::wstring keyNameW = std::wstring(keyName.begin(), keyName.end());
-    status = NCryptOpenKey(pHandle, &kHandle, keyNameW.c_str(), 0, NCRYPT_MACHINE_KEY_FLAG);
-    if (status != 0) {
-        std::cout << "\nError OpenKey: " << std::hex << status << std::endl;
-        exit(-1);
-    }
-    std::cout << "\nSuccess OpenKey" << std::endl;
-    std::cout << "\nKeyHandle: " << kHandle << std::endl;
-    std::cout << "Was a valide key? " << (NCryptIsKeyHandle(kHandle) ? "True" : "False") << std::endl;
-    Sleep(3000);
-}
+void EnumKeys() {
+    status = NCryptOpenStorageProvider(&pHandle, MS_PLATFORM_CRYPTO_PROVIDER, 0);
+    Error(status);
 
-void CreateKey(std::string keyName, std::string algName)
-{
-    
-    std::wstring keyNameW = std::wstring(keyName.begin(), keyName.end());
-    status = NCryptCreatePersistedKey(pHandle, &kHandle, (algName == "RSA" ? NCRYPT_RSA_ALGORITHM : NCRYPT_ECDSA_ALGORITHM), keyNameW.c_str(), 0, NCRYPT_MACHINE_KEY_FLAG);
-    if (status != 0) {
-        std::cout << "\nError CreatePersistedKey: " << std::hex << status << std::endl;
-        exit(-1);
-    }
+    do
+    {
+        status = NCryptEnumKeys(pHandle, NULL, &keys, &temp, 0);
 
-    status = NCryptFinalizeKey(kHandle, NCRYPT_WRITE_KEY_TO_LEGACY_STORE_FLAG);
-    if (status != 0) {
-        std::cout << "\nError FinalizeKey: " << std::hex << status << std::endl;
-        exit(-1);
-    }
+        LOG(CW2A(keys->pszName));
+        LOG(CW2A(keys->pszAlgid));
+        LOG("");
 
-    std::cout << "Success CreatePersistedKey" << std::endl;
-    Sleep(3000);
-}
-
-void Encrypt() {
-    BYTE data = (BYTE)54657374; // Hex ("Test")
-    DWORD dataSize;
-
-    BYTE encryptedData;
-
-    BCRYPT_OAEP_PADDING_INFO padding;
-
-    status = NCryptEncrypt(kHandle, &data, sizeof(data), NULL, NULL,NULL, &dataSize, 0);
-    if (status != 0) {
-        std::cout << "\nError get encrypt size: " << std::hex << status << std::endl;
-        exit(-1);
-    }
-
-    status = NCryptEncrypt(kHandle, &data, sizeof(data), &padding, &encryptedData, dataSize, NULL, NCRYPT_PAD_OAEP_FLAG);
-    if (status != 0) {
-        std::cout << "\nError EnCrypt: " << std::hex << status << std::endl;
-        exit(-1);
-    }
-
-    std::cout << "Success Encrypt" << std::endl;
-    std::cout << "Data: " << (void*)data << std::endl;
-    std::cout << "EncryptedData: " << (void*)encryptedData << std::endl;
+    } while (status != NO_MORE_ITEMS);
 }
 
 int main()
 {
-    while (run) {
-        std::cout << "\n1 - List and choose a storage provider"<< std::endl;
-        std::cout << "2 - Enumerate the keys in the storage provider" << std::endl;
-        std::cout << "3 - Open a default key for the storage provider" << std::endl;
-        std::cout << "4 - Open a specified key for the storage provider" << std::endl;
-        std::cout << "5 - Create a new PersistedKey" << std::endl;
-        std::cout << "6 - Encrypt some data" << std::endl;
-        std::cout << "7 - Exit program" << std::endl;
-        std::cin >> op;
-        switch (op)
-        {
-        case 1: 
-            ChooseProvider();
-            break;
-        case 2:
-            EnumKeys();
-            break;
-        case 3:
-            OpenKey();
-            break;
-        case 4:
-            
-            std::cout << "Enter the keyName: ";
-            std::cin >> keyName;
-            OpenKey(keyName);
-            keyName.clear();
-            break;
-        case 5:
-            std::cout << "Enter the keyName: ";
-            std::cin >> keyName;
-            std::cout << "Enter the algName (RSA or ECDSA): ";
-            std::cin >> algName;
-            CreateKey(keyName, algName);
-            keyName.clear();
-            algName.clear();
-            break;
-        case 6: 
-            Encrypt();
-            break;
-        case 7: 
-            run = false;
-            break;
-        default:
-            break;
-        }
-        system("cls");
-    }
-    NCryptFreeBuffer(providers);
-    NCryptFreeBuffer(keys);
+
+    CreateKey();
+    RetrieveKey();
+    EnumKeys();
 
     NCryptFreeObject(pHandle);
     NCryptFreeObject(kHandle);
+    NCryptFreeBuffer(keys);
 }
-
