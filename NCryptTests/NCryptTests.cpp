@@ -66,10 +66,12 @@ void RetrieveKey() {
     status = NCryptOpenStorageProvider(&pHandle, L"Microsoft Platform Crypto Provider", 0);
     Error(status);
 
-    wstring wKeyName = stringToWString();
+    LOG("Enter a key name: ");
+    cin >> tempString;
+    wstring wtempString = stringToWString(tempString);
 
     cout << "Opening key from the provider (PCP)...\n\n";
-    status = NCryptOpenKey(pHandle, &kHandle, wKeyName.c_str(), 0, 0);
+    status = NCryptOpenKey(pHandle, &kHandle, wtempString.c_str(), 0, 0);
     Error(status);
 
     cout << "Validating recovery key...\n\n";
@@ -99,9 +101,11 @@ void DeleteKey() {
     status = NCryptOpenStorageProvider(&pHandle, L"Microsoft Platform Crypto Provider", 0);
     Error(status);
 
-    wstring wKeyName = stringToWString();
+    LOG("Enter a key name: ");
+    cin >> tempString;
+    wstring wtempString = stringToWString(tempString);
 
-    status = NCryptOpenKey(pHandle, &kHandle, wKeyName.c_str(), 0, 0);
+    status = NCryptOpenKey(pHandle, &kHandle, wtempString.c_str(), 0, 0);
     Error(status);
 
     status = NCryptDeleteKey(kHandle, 0);
