@@ -5,6 +5,12 @@
 
 using namespace std;
 
+enum Algorithm
+{
+    RSA,
+    ECDSA
+};
+
 #define NO_MORE_ITEMS -2146893782
 
 #define Error(status) if (status != 0) cout << "Error Code: " << hex << status << endl;
@@ -19,6 +25,14 @@ SECURITY_STATUS status;
 NCryptKeyName* keys;
 PVOID temp = NULL;
 bool createKey = true;
+int op;
+string tempString;
+
+wstring stringToWString(string someString) {
+
+    wstring wSomeString = wstring(someString.begin(), someString.end());
+    return wSomeString;
+}
 
 void CreateKey() {
     cout << "Starting key creating flow\n\n";
@@ -27,7 +41,11 @@ void CreateKey() {
     status = NCryptOpenStorageProvider(&pHandle, L"Microsoft Platform Crypto Provider", 0);
     Error(status);
 
-    status = NCryptCreatePersistedKey(pHandle, &kHandle, L"RSA", L"TPM", 0, NCRYPT_OVERWRITE_KEY_FLAG);
+    LOG("Enter a key name: ");
+    cin >> tempString;
+    wstring wtempString = stringToWString(tempString);
+
+    status = NCryptCreatePersistedKey(pHandle, &kHandle, L"ECDSA", wtempString.c_str(), 0, NCRYPT_OVERWRITE_KEY_FLAG);
     cout << "Creating Key...\n\n";
     Error(status);
 
@@ -48,8 +66,10 @@ void RetrieveKey() {
     status = NCryptOpenStorageProvider(&pHandle, L"Microsoft Platform Crypto Provider", 0);
     Error(status);
 
+    wstring wKeyName = stringToWString();
+
     cout << "Opening key from the provider (PCP)...\n\n";
-    status = NCryptOpenKey(pHandle, &kHandle, L"7b83e0bc-e218-400c-8a73-7b9139901193", 0, 0);
+    status = NCryptOpenKey(pHandle, &kHandle, wKeyName.c_str(), 0, 0);
     Error(status);
 
     cout << "Validating recovery key...\n\n";
@@ -57,26 +77,76 @@ void RetrieveKey() {
 }
 
 void EnumKeys() {
+    temp = NULL;
     status = NCryptOpenStorageProvider(&pHandle, MS_PLATFORM_CRYPTO_PROVIDER, 0);
     Error(status);
 
-    do
-    {
+    while (true) {
         status = NCryptEnumKeys(pHandle, NULL, &keys, &temp, 0);
+
+        if (status == NO_MORE_ITEMS) break;
 
         LOG(CW2A(keys->pszName));
         LOG(CW2A(keys->pszAlgid));
         LOG("");
+    }
+}
 
-    } while (status != NO_MORE_ITEMS);
+void DeleteKey() {
+    cout << "Starting key deleting flow\n\n";
+
+    cout << "Opening Storage provider (PCP)...\n\n";
+    status = NCryptOpenStorageProvider(&pHandle, L"Microsoft Platform Crypto Provider", 0);
+    Error(status);
+
+    wstring wKeyName = stringToWString();
+
+    status = NCryptOpenKey(pHandle, &kHandle, wKeyName.c_str(), 0, 0);
+    Error(status);
+
+    status = NCryptDeleteKey(kHandle, 0);
+    Error(status);
+
+    LOG("Delete key success\n\n");
 }
 
 int main()
 {
+    bool cond = true;
+    while (cond)
+    {
+        LOG("1 - Create a key\n");
+        LOG("2 - Retrieve a key\n");
+        LOG("3 - Enums the keys\n");
+        LOG("4 - Delete a key\n");
+        LOG("5 - Exit\n");
 
-    CreateKey();
-    RetrieveKey();
-    EnumKeys();
+        cin >> op;
+
+        switch (op)
+        {
+        case 1:
+            system("cls");
+            CreateKey();
+            break;
+        case 2:
+            system("cls");
+            RetrieveKey();
+            break;
+        case 3:
+            system("cls");
+            EnumKeys();
+            break;
+        case 4:
+            DeleteKey();
+            break;
+        case 5:
+            cond = false;
+            break;
+        default:
+            break;
+        }
+    }
 
     NCryptFreeObject(pHandle);
     NCryptFreeObject(kHandle);
